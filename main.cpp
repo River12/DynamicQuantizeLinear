@@ -14,7 +14,7 @@ using namespace std;
 #define QMAX 255
 
 #define NUM_THREADS 32
-#define TENSOR_SIZE 100000000
+#define TENSOR_SIZE 1000000000
 // #define TENSOR_SIZE 10000
 int TILE_SIZE = 8;
 
@@ -279,7 +279,7 @@ void dynamicQuantizeLinear_omp_avx512_fused(float *input, size_t size, unsigned 
     y_zero_point = fmaxf(QMIN, fminf(QMAX, round((0 - min_val) / y_scale)));
 
 
-    __m512 y_scale512 = _mm512_set1_ps(1.0 / y_scale);        // inverse of y_scal, for easy multiplication
+    __m512 y_scale512 = _mm512_set1_ps(1.0 / y_scale);        // inverse of y_scale, for easy multiplication
     __m512 y_zero_point512 = _mm512_set1_ps(y_zero_point * 1.0);
     __m512i mask512 = _mm512_set1_epi32((QMAX - QMIN));
     size_t remain = size % 16;

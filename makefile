@@ -21,9 +21,5 @@ release: clean
 run:
 	./$(EXECUTABLE)
 
-# test:
-# 	./$(EXECUTABLE) -m matrix_case/benchmark/oscil_trans_01.mtx -p 2 -s 6
-
-
 clean:
 	rm -rf *.o $(EXECUTABLE)
