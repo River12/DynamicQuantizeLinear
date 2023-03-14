@@ -1,6 +1,6 @@
 CXX       := g++
-CXX_FLAGS := -std=c++11 -ggdb -g -fopenmp -Wall -w -mavx512f -msse4.2 -march=native
-RELEASE_CXX_FLAGS := -std=c++11 -o3 -fopenmp -mavx512f -msse4.2 -march=native
+CXX_FLAGS := -std=c++11 -ggdb -g -fopenmp -Wall -w -mavx512f -march=native
+RELEASE_CXX_FLAGS := -std=c++11 -o3 -fopenmp -mavx512f -march=native
 
 BIN     := 
 SRC     := ./*.cpp

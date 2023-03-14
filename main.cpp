@@ -13,10 +13,10 @@ using namespace std;
 #define QMIN 0
 #define QMAX 255
 
-#define NUM_THREADS 32
+#define NUM_THREADS 16
 #define TENSOR_SIZE 1000000000
 // #define TENSOR_SIZE 10000
-int TILE_SIZE = 8;
+int TILE_SIZE = 16;
 
 /**
  * Test Platform
@@ -41,22 +41,33 @@ void dynamicQuantizeLinear_naive(float *input, size_t size, unsigned int *output
     //     max_val = fmaxf(0, fmaxf(max_val, input[i]));
     // }
 
+    // double start, end, tm1, tm2;
+    // start = omp_get_wtime();
     for(size_t i=0; i<size; i++) {
         min_val = fminf(min_val, input[i]);
         max_val = fmaxf(max_val, input[i]);
     }
+    // end = omp_get_wtime();
+    // tm1 = end - start;
+
     min_val = fminf(0, min_val);
     max_val = fmaxf(0, max_val);
+
 
     // calculate y_scale and y_zero_point
     y_scale = (max_val - min_val) / (QMAX - QMIN); 
     y_zero_point = fmaxf(QMIN, fminf(QMAX, round((0 - min_val) / y_scale)));
 
     // calculate y
+    // start = omp_get_wtime();
     for(size_t i=0; i<size; i++) {
         output[i] = fmaxf(QMIN, fminf(QMAX, round(input[i] / y_scale) + y_zero_point));
     }
+    // end = omp_get_wtime();
+    // tm2 = end - start;
 
+    // cout << "1st loop: " << tm1 << ", 2nd loop:" << tm2 << endl;
+    // 1st loop: 4.58273, 2nd loop:9.45152    for input size 1e9
 }
 
 
@@ -89,7 +100,7 @@ void dynamicQuantizeLinear_omp(float *input, size_t size, unsigned int *output, 
     // calculate y
     #pragma omp parallel for simd
     for(size_t i = 0; i < size; i++) {
-        float tmp = round(input[i] / y_scale) + y_zero_point;
+        float tmp = round(input[i] / y_scale) + y_zero_point;  // contain operations that cannot be vectorized
         if(QMAX < tmp) tmp = QMAX;
         if(QMIN > tmp) tmp = QMIN;
         output[i] = tmp;
@@ -124,21 +135,33 @@ void dynamicQuantizeLinear_omp_tiling(float *input, size_t size, unsigned int *o
 
     size_t remain = size % TILE_SIZE;
     size_t num_iter = size - remain;
+    size_t num_tile = (int) size / TILE_SIZE;
+    // cout << "num_tile: " << num_tile << ", num_iter: " << num_iter << " remain: " << remain << endl;
 
-    // cout << "num_iter: " << num_iter << " remain: " << remain << endl;
     // calculate y
+
+    // #pragma omp parallel for
+    // for(size_t i = 0; i < num_iter; i += TILE_SIZE) {
+    //     for(size_t j = i; j < i + TILE_SIZE; j++) {
+    //         float tmp = round(input[j] / y_scale) + y_zero_point;
+    //         if(QMAX < tmp) tmp = QMAX;
+    //         if(QMIN > tmp) tmp = QMIN;
+    //         output[j] = tmp;
+
+    //     }
+
+    // }
+
+    
+    // bug fixed here, to improve cache hit
     #pragma omp parallel for
-    for(size_t i = 0; i < num_iter; i += TILE_SIZE) {
-
-        for(size_t j=0; j < TILE_SIZE; j++) {
-            size_t idx = i + j;
-            float tmp = round(input[idx] / y_scale) + y_zero_point;
-            if(QMAX < tmp) tmp = QMAX;
-            if(QMIN > tmp) tmp = QMIN;
-            output[idx] = tmp;
-
-        }
-
+    for(size_t j = 0; j < num_tile; j++) {
+        int tid = omp_get_thread_num();
+        size_t idx = j * TILE_SIZE + tid;
+        float tmp = round(input[idx] / y_scale) + y_zero_point;
+        if(QMAX < tmp) tmp = QMAX;
+        if(QMIN > tmp) tmp = QMIN;
+        output[idx] = tmp;
     }
 
     // process the remaining part
@@ -321,10 +344,10 @@ void test1_dynamicQuantizeLinear()
 
     // dynamicQuantizeLinear_naive(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp(A, size, B, y_zero_point, y_scale);
-    // dynamicQuantizeLinear_omp_tiling(A, size, B, y_zero_point, y_scale);
+    dynamicQuantizeLinear_omp_tiling(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp_avx(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp_avx512(A, size, B, y_zero_point, y_scale);
-    dynamicQuantizeLinear_omp_avx512_fused(A, size, B, y_zero_point, y_scale);
+    // dynamicQuantizeLinear_omp_avx512_fused(A, size, B, y_zero_point, y_scale);
 
     cout << "y_scale: " << y_scale << ", y_zero_point: " << y_zero_point << endl;
     for(int i=0; i<size; i++) {
@@ -346,10 +369,10 @@ void test2_dynamicQuantizeLinear()
 
     // dynamicQuantizeLinear_naive(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp(A, size, B, y_zero_point, y_scale);
-    // dynamicQuantizeLinear_omp_tiling(A, size, B, y_zero_point, y_scale);
+    dynamicQuantizeLinear_omp_tiling(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp_avx(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp_avx512(A, size, B, y_zero_point, y_scale);
-    dynamicQuantizeLinear_omp_avx512_fused(A, size, B, y_zero_point, y_scale);
+    // dynamicQuantizeLinear_omp_avx512_fused(A, size, B, y_zero_point, y_scale);
 
     cout << "y_scale: " << y_scale << ", y_zero_point: " << y_zero_point << endl;
     for(int i=0; i<size; i++) {
@@ -371,10 +394,10 @@ void test3_dynamicQuantizeLinear()
 
     // dynamicQuantizeLinear_naive(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp(A, size, B, y_zero_point, y_scale);
-    // dynamicQuantizeLinear_omp_tiling(A, size, B, y_zero_point, y_scale);
+    dynamicQuantizeLinear_omp_tiling(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp_avx(A, size, B, y_zero_point, y_scale);
     // dynamicQuantizeLinear_omp_avx512(A, size, B, y_zero_point, y_scale);
-    dynamicQuantizeLinear_omp_avx512_fused(A, size, B, y_zero_point, y_scale);
+    // dynamicQuantizeLinear_omp_avx512_fused(A, size, B, y_zero_point, y_scale);
 
     cout << "y_scale: " << y_scale << ", y_zero_point: " << y_zero_point << endl;
     for(int i=0; i<size; i++) {
@@ -384,6 +407,13 @@ void test3_dynamicQuantizeLinear()
 
 }
 
+
+
+
+void scalability_analysis()
+{
+
+}
 
 int main() {
 
