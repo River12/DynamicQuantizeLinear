@@ -12,8 +12,8 @@ using namespace std;
 
 #define QMIN 0
 #define QMAX 255
-// #define TENSOR_SIZE 1000000000    // extremely large tensor: 1e9
-#define TENSOR_SIZE 100000           // large tensor: 100,000 1e7
+#define TENSOR_SIZE 1000000000    // extremely large tensor: 1e9
+// #define TENSOR_SIZE 100000           // large tensor: 100,000 1e5
 
 int NUM_THREADS = 32;
 int TILE_SIZE = 32;
@@ -45,7 +45,6 @@ int main() {
 
     for (size_t i = 0; i < 1000000000; i++) {};
 
-
     /*** Correctness Test ***/
     cout << "========== Correctness Test ==========" << endl;
     test1_dynamicQuantizeLinear();
@@ -67,16 +66,16 @@ int main() {
     cout << "input tensor size: " << sizeof(float) * TENSOR_SIZE / 1e6 << " MB" << endl;
 
 
-    cout << "========== Methods Test ==========" << endl;
-    test_methods(input, TENSOR_SIZE, output, y_zero_point, y_scale);
+    // cout << "========== Methods Test ==========" << endl;
+    // test_methods(input, TENSOR_SIZE, output, y_zero_point, y_scale);
 
 
     // cout << "========== Scalability Test ==========" << endl;
     // test_scalability(input, TENSOR_SIZE, output, y_zero_point, y_scale);
 
 
-    // cout << "========== Tile Size Test ==========" << endl;
-    // test_tile_size(input, TENSOR_SIZE, output, y_zero_point, y_scale);
+    cout << "========== Tile Size Test ==========" << endl;
+    test_tile_size(input, TENSOR_SIZE, output, y_zero_point, y_scale);
 
 
     delete []input;
@@ -597,6 +596,7 @@ void test_tile_size(float *input, size_t size, unsigned int *output, unsigned in
     vector<double> omp_tiling_vec; 
     for(TILE_SIZE=2; TILE_SIZE<513; TILE_SIZE *= 2) 
     {
+        // cout << TILE_SIZE << endl;
         fill_n(output, TENSOR_SIZE, 0);
         start = omp_get_wtime();
         dynamicQuantizeLinear_omp_tiling(input, size, output, y_zero_point, y_scale);
